@@ -64,4 +64,45 @@ export const usersService = {
 
 		return token;
 	},
+
+	async getUserProfile(token: string, credentials: any) {
+		const { email, password } = credentials;
+
+		// 1. Verify session token
+		const [session] = await db
+			.select()
+			.from(sessions)
+			.where(eq(sessions.token, token))
+			.limit(1);
+
+		if (!session) {
+			return null;
+		}
+
+		// 2. Fetch associated user
+		const [user] = await db
+			.select()
+			.from(users)
+			.where(eq(users.id, session.userId))
+			.limit(1);
+
+		if (!user) {
+			return null;
+		}
+
+		// 3. Verify credentials (email & password)
+		if (user.email !== email) {
+			return null;
+		}
+
+		const isPasswordValid = await bcrypt.compare(password, user.password);
+
+		if (!isPasswordValid) {
+			return null;
+		}
+
+		// 4. Return user profile (exclude password)
+		const { password: _, ...userProfile } = user;
+		return userProfile;
+	},
 };

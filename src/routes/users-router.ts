@@ -46,4 +46,33 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				password: t.String(),
 			}),
 		}
+	)
+	.post(
+		"/profile",
+		async ({ body, headers, set }) => {
+			const token = headers.authorization?.split(" ")[1];
+
+			if (!token) {
+				set.status = 401;
+				return { message: "unauthorized" };
+			}
+
+			const user = await usersService.getUserProfile(token, body);
+
+			if (!user) {
+				set.status = 401;
+				return { message: "unauthorized" };
+			}
+
+			return {
+				message: "Get User successfully",
+				data: user,
+			};
+		},
+		{
+			body: t.Object({
+				email: t.String(),
+				password: t.String(),
+			}),
+		}
 	);
