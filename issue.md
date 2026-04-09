@@ -1,83 +1,65 @@
-# Issue Implementation Plan: User Sessions Management
+# Feature Implementation Plan: Get User Profile
 
-This document outlines the steps to implement user sessions after a successful login. This includes database schema updates, service logic for session creation, and API response updates.
+This document outlines the steps to implement an authenticated API endpoint to retrieve user details.
 
-## 1. Database Schema Update
-Define the `sessions` table to store user login tokens.
+## Overview
+Implement a `POST /api/users/profile` endpoint that requires both a valid session token (in headers) and the user's credentials (in the request body) to return user profile information.
 
-**Target File:** `src/db/schema.ts`
-
-**Steps:**
-1.  Import `int` or `serial` from `drizzle-orm/mysql-core` (if not already present).
-2.  Import `users` table reference to create a foreign key relationship.
-3.  Define a new table `sessions`:
-    - `id`: integer, primary key, auto-increment.
-    - `token`: varchar(255), not null (will store a UUID).
-    - `userId`: integer, foreign key to `users.id`.
-    - `createdAt`: timestamp, defaults to `current_timestamp`.
-
-**Example Drizzle Code:**
-```typescript
-export const sessions = mysqlTable("sessions", {
-	id: serial("id").primaryKey(),
-	token: varchar("token", { length: 255 }).notNull(),
-	userId: int("user_id").references(() => users.id),
-	createdAt: timestamp("created_at").defaultNow(),
-});
-```
-
-**Sync Database:**
-Run the following commands to apply changes:
-```bash
-npx drizzle-kit generate
-npx drizzle-kit push
-```
-
-## 2. Implement Session Service Logic
-Handle the creation of the session token and storage.
+## 1. Services Layer Implementation
+Implement the profile retrieval logic.
 
 **Target File:** `src/services/users-service.ts`
 
 **Steps:**
-1.  Update the `loginUser` service (or create a new helper in `users-service`).
-2.  After verifying the password successfully:
-    - Generate a unique token (UUID). In Bun, you can use `crypto.randomUUID()`.
-    - Insert a new record into the `sessions` table with the generated `token` and the `user.id`.
-    - Modify the `loginUser` return value to include this `token`.
+1.  Add a new method `getUserProfile(token: string, credentials: any)`:
+    - It should accept the session `token` and the `credentials` object (containing `email` and `password`).
+    - First, query the `sessions` table to find an entry matching the provided `token`.
+    - If no session is found, return `null`.
+    - If a session is found, retrieve the associated user using the `userId` from the session.
+    - Verify that the `email` from the credentials matches the retrieved user's email.
+    - Use `bcrypt.compare` to verify that the `password` from the credentials matches the user's hashed password.
+    - If all checks pass, return the user object (excluding the password).
+    - If any check fails, return `null`.
 
-**Note:** Ensure you import the `sessions` table from the schema file.
-
-## 3. Update User Router
-Expose the login functionality with the new session behavior.
+## 2. Routes Layer Implementation
+Define the endpoint and handle HTTP request/response.
 
 **Target File:** `src/routes/users-router.ts`
 
 **Steps:**
-1.  Locate the `POST /login` route inside `usersRouter`.
-2.  Ensure it calls the updated `usersService.loginUser`.
-3.  Update the success response body to match the following structure:
-    ```json
-    {
-        "message": "User created successfully",
-        "data": "SESSION_TOKEN_HERE"
-    }
-    ```
-    *(Note: Per requirements, use the message "User created successfully" even for login).*
+1.  Add a new POST route `/profile`:
+    - **Path:** `/profile` (resulting in `POST /api/users/profile`)
+    - **Logic:**
+        - Extract the `Authorization` header.
+        - Parse the Bearer token: `const token = headers.authorization?.split(' ')[1]`.
+        - If no token is provided, return `{ "message": "unauthorized" }` with a 401 status.
+        - Call `usersService.getUserProfile(token, body)`.
+        - If it returns `null`, return `{ "message": "unauthorized" }` with a 401 status.
+        - If successful, return the JSON response:
+          ```json
+          {
+              "message": "User created successfully",
+              "data": {
+                  "id": 1,
+                  "name": "User Name",
+                  "email": "user@mail.com",
+                  "created_at": "timestamp"
+              }
+          }
+          ```
+          *(Note: Per requirements, use the message "User created successfully" even for profile retrieval).*
 
-4.  Ensure failure still returns:
-    ```json
-    {
-        "message": "error"
-    }
-    ```
+2.  **Schema Validation:**
+    - Use `t.Object` for the body validation (`email` and `password`).
 
-## 4. Verification
-1.  Restart the server: `bun run dev`.
-2.  Register a user (if not already exists).
-3.  Test the login endpoint using `curl`:
+## 3. Verification
+1.  Ensure the server is running: `bun run dev`.
+2.  Login first to obtain a session token.
+3.  Test the profile endpoint using `curl`:
     ```bash
-    curl -X POST http://localhost:3000/api/users/login \
+    curl -X POST http://localhost:3000/api/users/profile \
+    -H "Authorization: Bearer <YOUR_TOKEN>" \
     -H "Content-Type: application/json" \
-    -d '{"email": "fi@mail.com", "password": "yourpassword"}'
+    -d '{"email": "fi@mail.com", "password": "password123"}'
     ```
-4.  Verify that a token is returned and a corresponding entry exists in the `sessions` table.
+4.  Verify that it returns the user profile on success or "unauthorized" on incorrect token/credentials.
