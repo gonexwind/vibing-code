@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { usersService } from "../services/users-service";
 
 export const usersRouter = new Elysia({ prefix: "/api/users" })
+	// --- Public Routes ---
 	.post(
 		"/",
 		async ({ body, set }) => {
@@ -47,49 +48,40 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 			}),
 		}
 	)
-	.post(
-		"/profile",
-		async ({ headers, set }) => {
-			const token = headers.authorization?.split(" ")[1];
 
-			if (!token) {
-				set.status = 401;
-				return { message: "unauthorized" };
-			}
+	// --- Protected Routes ---
+	.derive(async ({ headers, set }) => {
+		const token = headers.authorization?.split(" ")[1];
 
-			const user = await usersService.getUserProfile(token);
-
-			if (!user) {
-				set.status = 401;
-				return { message: "unauthorized" };
-			}
-
-			return {
-				message: "Get User successfully",
-				data: user,
-			};
+		if (!token) {
+			set.status = 401;
+			return { authError: "unauthorized" };
 		}
-	)
-	.post(
-		"/logout",
-		async ({ headers, set }) => {
-			const token = headers.authorization?.split(" ")[1];
 
-			if (!token) {
-				set.status = 401;
-				return { message: "unauthorized" };
-			}
+		const user = await usersService.findUserByToken(token);
 
-			const user = await usersService.logoutUser(token);
-
-			if (!user) {
-				set.status = 401;
-				return { message: "unauthorized" };
-			}
-
-			return {
-				message: "",
-				data: user,
-			};
+		if (!user) {
+			set.status = 401;
+			return { authError: "unauthorized" };
 		}
-	);
+
+		return { user, token };
+	})
+	.post("/profile", async ({ user, authError }) => {
+		if (authError) return { message: authError };
+
+		return {
+			message: "Get User successfully",
+			data: user,
+		};
+	})
+	.post("/logout", async ({ token, authError }) => {
+		if (authError) return { message: authError };
+
+		const userProfile = await usersService.logoutUser(token);
+
+		return {
+			message: "",
+			data: userProfile,
+		};
+	});
