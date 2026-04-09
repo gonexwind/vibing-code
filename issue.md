@@ -1,62 +1,58 @@
-# Feature Implementation Plan: User Logout
+# Bug Report: Missing Input Validation for User Registration
 
-This document outlines the steps to implement a secure user logout endpoint.
+## Description
+The user registration endpoint (`POST /api/users`) lacks proper input validation. While the database schema correctly limits fields to 255 characters, the application does not validate this limit before attempting the database insert. This results in generic 400 "Error" responses caused by database exceptions when inputs are too long, rather than specific validation errors.
 
-## Overview
-Implement a `POST /api/users/logout` endpoint that invalidates a user session by deleting the token from the `sessions` table after verifying both the session token and the user's credentials.
+## Steps to Reproduce
+1. Attempt to register a new user with a name that is 300 characters long.
+2. The server will return a generic `{"message":"Error"}`.
+3. The server console will show a MySQL error regarding data length.
 
-## 1. Services Layer Implementation
-Implement the session invalidation logic.
+## How to Fix (Step-by-Step)
 
-**Target File:** `src/services/users-service.ts`
-
-**Steps:**
-1.  Add a new method `logoutUser(token: string, credentials: any)`:
-    - It should accept the session `token` and the `credentials` object (containing `email` and `password`).
-    - First, use logic similar to `getUserProfile` to verify the `token` exists in the `sessions` table and that the `email` and `password` match the associated user.
-    - If any verification step fails, return `null`.
-    - If verification is successful:
-        - Retrieve the user data to be returned in the response.
-        - Delete the session record from the `sessions` table using `db.delete(sessions).where(eq(sessions.token, token))`.
-        - Return the user object (excluding the password).
-
-## 2. Routes Layer Implementation
-Define the logout endpoint.
+### Step 1: Add Input Validation to Routes
+Implement schema validation using Elysia's `t` (TypeBox) to match the database constraints and ensure data integrity.
 
 **Target File:** `src/routes/users-router.ts`
 
-**Steps:**
-1.  Add a new POST route `/logout`:
-    - **Path:** `/logout` (resulting in `POST /api/users/logout`)
-    - **Logic:**
-        - Extract the Bearer token from the `Authorization` header.
-        - If no token is provided, return `{ "message": "unauthorized" }` with a 401 status.
-        - Call `usersService.logoutUser(token, body)`.
-        - If it returns `null`, return `{ "message": "unauthorized" }` with a 401 status.
-        - If successful, return the JSON response:
-          ```json
-          {
-              "message": "User created successfully",
-              "data": {
-                  "id": 1,
-                  "name": "User Name",
-                  "email": "user@mail.com",
-                  "created_at": "timestamp"
-              }
-          }
-          ```
-          *(Note: Per requirements, use the message "User created successfully" even for logout).*
+**Implementation:**
+Update the `.post("/")` (registration) and other relevant routes to include validation for `name`, `email`, and `password`.
 
-2.  **Schema Validation:**
-    - Use `t.Object` for the body validation (`email` and `password`).
+1.  **Name**: Limit to 255 characters to match the database `varchar(255)`.
+2.  **Email**: Validated as a proper email format and limited to 255 characters.
+3.  **Password**: Add a minimum length (e.g., 8 characters) for security, and limit to 255 characters.
 
-## 3. Verification
-1.  Ensure the server is running: `bun run dev`.
-2.  Login to obtain a session token.
-3.  Test the logout endpoint using `curl`:
-    ```bash
-    curl -X POST http://localhost:3000/api/users/logout \
-    -H "Authorization: Bearer <YOUR_TOKEN>" \
-    -H "Content-Type: application/json" 
-    ```
-4.  Verify that it returns the user details and the session is removed from the database (subsequent requests using the same token should fail).
+```typescript
+// src/routes/users-router.ts updates
+
+// Registration validation
+{
+    body: t.Object({
+        name: t.String({ minLength: 1, maxLength: 255 }),
+        email: t.String({ format: 'email', maxLength: 255 }),
+        password: t.String({ minLength: 8, maxLength: 255 }),
+    }),
+}
+
+// Login validation
+{
+    body: t.Object({
+        email: t.String({ format: 'email' }),
+        password: t.String(),
+    }),
+}
+```
+
+### Step 2: Handle Validation Errors (Optional but Recommended)
+Elysia automatically handles validation errors and returns a 400 status. Ensure the error handling in the `try-catch` block doesn't swallow specific validation details if you choose to customize the response.
+
+### Step 3: Verification
+1.  **Test 300 chars**: Register with a 300-character name. It should now return a specific validation error (e.g., `Expected string length less than or equal to 255`) instead of a generic "Error".
+2.  **Test Valid Input**: Register with valid data and ensure it still works.
+3.  **Test Invalid Email**: Try an invalid email format to verify the `format: 'email'` check.
+4.  **Test Short Password**: Try a 4-character password to verify the `minLength: 8` check.
+
+## Schema Reference (for Alignment)
+The following limits are defined in `src/db/schema.ts` and must be respected by the validation layer:
+- `users`: `name` (255), `email` (255), `password` (255).
+- `sessions`: `token` (255).
