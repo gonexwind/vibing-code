@@ -15,6 +15,20 @@
       "when": 1775701516026,
       "tag": "0001_slimy_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1775704887774,
+      "tag": "0002_modern_boom_boom",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1775704906777,
+      "tag": "0003_blushing_hardball",
+      "breakpoints": true
     }
   ]
 }

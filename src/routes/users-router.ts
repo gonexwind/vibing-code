@@ -13,7 +13,8 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				};
 			} catch (error) {
 				set.status = 400;
-				return { message: "error" };
+				console.log(error);
+				return { message: "Error" };
 			}
 		},
 		{
@@ -27,16 +28,16 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 	.post(
 		"/login",
 		async ({ body, set }) => {
-			const user = await usersService.loginUser(body);
+			const token = await usersService.loginUser(body);
 
-			if (!user) {
+			if (!token) {
 				set.status = 401;
 				return { message: "error" };
 			}
 
 			return {
-				message: "User logged in successfully",
-				data: user,
+				message: "User created successfully",
+				data: token,
 			};
 		},
 		{
