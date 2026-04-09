@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { users } from "../db/schema";
+import { users, sessions } from "../db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
@@ -53,8 +53,15 @@ export const usersService = {
 			return null;
 		}
 
-		// Return user without password
-		const { password: _, ...userWithoutPassword } = user;
-		return userWithoutPassword;
+		// Generate session token
+		const token = crypto.randomUUID();
+
+		// Save session
+		await db.insert(sessions).values({
+			token,
+			userId: user.id,
+		});
+
+		return token;
 	},
 };
