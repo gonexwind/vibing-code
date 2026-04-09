@@ -1,14 +1,11 @@
 import { Elysia } from "elysia";
 import { swagger } from "@elysiajs/swagger";
-import { db } from "./db";
-import { users } from "./db/schema";
+import { usersRouter } from "./routes/users-router";
 
 const app = new Elysia()
 	.use(swagger())
+	.use(usersRouter)
 	.get("/", () => "Hello Elysia")
-	.get("/users", async () => {
-		return await db.select().from(users);
-	})
 	.listen(3000);
 
 console.log(
