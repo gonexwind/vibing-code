@@ -20,9 +20,9 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 		},
 		{
 			body: t.Object({
-				name: t.String(),
-				email: t.String(),
-				password: t.String(),
+				name: t.String({ minLength: 1, maxLength: 255 }),
+				email: t.String({ format: "email", maxLength: 255 }),
+				password: t.String({ minLength: 8, maxLength: 255 }),
 			}),
 		}
 	)
@@ -43,7 +43,7 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 		},
 		{
 			body: t.Object({
-				email: t.String(),
+				email: t.String({ format: "email" }),
 				password: t.String(),
 			}),
 		}
