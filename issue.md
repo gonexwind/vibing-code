@@ -1,58 +1,49 @@
-# Bug Report: Missing Input Validation for User Registration
+# Feature Implementation Plan: API Unit Testing
 
-## Description
-The user registration endpoint (`POST /api/users`) lacks proper input validation. While the database schema correctly limits fields to 255 characters, the application does not validate this limit before attempting the database insert. This results in generic 400 "Error" responses caused by database exceptions when inputs are too long, rather than specific validation errors.
+## Overview
+Implement comprehensive unit tests for all available user authentication and management APIs using `bun test`.
 
-## Steps to Reproduce
-1. Attempt to register a new user with a name that is 300 characters long.
-2. The server will return a generic `{"message":"Error"}`.
-3. The server console will show a MySQL error regarding data length.
+## Technical Requirements
+- **Framework:** `bun test`
+- **Location:** All test files must be saved in the `tests` directory at the root of the project.
+- **Data Consistency Requirement:** The database state MUST be cleared before every single test scenario executes to ensure tests are isolated and consistent. (e.g., Use `beforeEach` hooks to clear the `users` and `sessions` tables).
 
-## How to Fix (Step-by-Step)
+---
 
-### Step 1: Add Input Validation to Routes
-Implement schema validation using Elysia's `t` (TypeBox) to match the database constraints and ensure data integrity.
+## Test Scenarios to Implement
 
-**Target File:** `src/routes/users-router.ts`
+Do not worry about the low-level implementation details in this document; simply follow this list of scenarios and write the corresponding test blocks. Ensure you cover as many edge cases as possible based on these scenarios.
 
-**Implementation:**
-Update the `.post("/")` (registration) and other relevant routes to include validation for `name`, `email`, and `password`.
+### 1. User Registration (`POST /api/users`)
+*   **Success Scenario:**
+    *   Register a new user with valid `name`, `email`, and `password`. Verify the user is created and returned correctly (status 200).
+*   **Failure Scenarios (Validation & Constraints):**
+    *   Attempt to register with an email that is already in use (Conflict/Error handling).
+    *   Attempt to register with a `name` exceeding 255 characters.
+    *   Attempt to register with an invalid `email` format.
+    *   Attempt to register with a `password` shorter than 8 characters.
+    *   Attempt to register with missing required fields in the request body.
 
-1.  **Name**: Limit to 255 characters to match the database `varchar(255)`.
-2.  **Email**: Validated as a proper email format and limited to 255 characters.
-3.  **Password**: Add a minimum length (e.g., 8 characters) for security, and limit to 255 characters.
+### 2. User Login (`POST /api/users/login`)
+*   **Success Scenario:**
+    *   Login with valid credentials. Verify a valid session token is returned (status 200) and a session record is created in the database.
+*   **Failure Scenarios:**
+    *   Attempt to login with an unregistered email. (Expect 401 Unauthorized)
+    *   Attempt to login with a correct email but an incorrect password. (Expect 401 Unauthorized)
+    *   Attempt to login with an invalid email format in the request body. (Validation Error)
+    *   Attempt to login with missing fields. (Validation Error)
 
-```typescript
-// src/routes/users-router.ts updates
+### 3. Get User Profile (`POST /api/users/profile`)
+*   **Success Scenario:**
+    *   Request profile with a valid `Bearer token` in the `Authorization` header. Verify the user profile data is returned correctly and that the **password is not exposed**.
+*   **Failure Scenarios (Authentication):**
+    *   Attempt to request profile without an `Authorization` header. (Expect 401 Unauthorized)
+    *   Attempt to request profile with an invalid, malformed, or fake Bearer token. (Expect 401 Unauthorized)
 
-// Registration validation
-{
-    body: t.Object({
-        name: t.String({ minLength: 1, maxLength: 255 }),
-        email: t.String({ format: 'email', maxLength: 255 }),
-        password: t.String({ minLength: 8, maxLength: 255 }),
-    }),
-}
-
-// Login validation
-{
-    body: t.Object({
-        email: t.String({ format: 'email' }),
-        password: t.String(),
-    }),
-}
-```
-
-### Step 2: Handle Validation Errors (Optional but Recommended)
-Elysia automatically handles validation errors and returns a 400 status. Ensure the error handling in the `try-catch` block doesn't swallow specific validation details if you choose to customize the response.
-
-### Step 3: Verification
-1.  **Test 300 chars**: Register with a 300-character name. It should now return a specific validation error (e.g., `Expected string length less than or equal to 255`) instead of a generic "Error".
-2.  **Test Valid Input**: Register with valid data and ensure it still works.
-3.  **Test Invalid Email**: Try an invalid email format to verify the `format: 'email'` check.
-4.  **Test Short Password**: Try a 4-character password to verify the `minLength: 8` check.
-
-## Schema Reference (for Alignment)
-The following limits are defined in `src/db/schema.ts` and must be respected by the validation layer:
-- `users`: `name` (255), `email` (255), `password` (255).
-- `sessions`: `token` (255).
+### 4. User Logout (`POST /api/users/logout`)
+*   **Success Scenario:**
+    *   Request logout with a valid `Bearer token`. Verify the return value (status 200) and **crucially**, verify that the session record has been successfully deleted from the database.
+*   **Failure Scenarios:**
+    *   Attempt to logout without an `Authorization` header. (Expect 401 Unauthorized)
+    *   Attempt to logout with an invalid or previously deleted token. (Expect 401 Unauthorized) 
+    *   Attempt to request the profile endpoint using the same token *after* a successful logout to ensure it fails.
