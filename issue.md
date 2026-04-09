@@ -1,39 +1,37 @@
-# Feature Implementation Plan: Get User Profile
+# Feature Implementation Plan: User Logout
 
-This document outlines the steps to implement an authenticated API endpoint to retrieve user details.
+This document outlines the steps to implement a secure user logout endpoint.
 
 ## Overview
-Implement a `POST /api/users/profile` endpoint that requires both a valid session token (in headers) and the user's credentials (in the request body) to return user profile information.
+Implement a `POST /api/users/logout` endpoint that invalidates a user session by deleting the token from the `sessions` table after verifying both the session token and the user's credentials.
 
 ## 1. Services Layer Implementation
-Implement the profile retrieval logic.
+Implement the session invalidation logic.
 
 **Target File:** `src/services/users-service.ts`
 
 **Steps:**
-1.  Add a new method `getUserProfile(token: string, credentials: any)`:
+1.  Add a new method `logoutUser(token: string, credentials: any)`:
     - It should accept the session `token` and the `credentials` object (containing `email` and `password`).
-    - First, query the `sessions` table to find an entry matching the provided `token`.
-    - If no session is found, return `null`.
-    - If a session is found, retrieve the associated user using the `userId` from the session.
-    - Verify that the `email` from the credentials matches the retrieved user's email.
-    - Use `bcrypt.compare` to verify that the `password` from the credentials matches the user's hashed password.
-    - If all checks pass, return the user object (excluding the password).
-    - If any check fails, return `null`.
+    - First, use logic similar to `getUserProfile` to verify the `token` exists in the `sessions` table and that the `email` and `password` match the associated user.
+    - If any verification step fails, return `null`.
+    - If verification is successful:
+        - Retrieve the user data to be returned in the response.
+        - Delete the session record from the `sessions` table using `db.delete(sessions).where(eq(sessions.token, token))`.
+        - Return the user object (excluding the password).
 
 ## 2. Routes Layer Implementation
-Define the endpoint and handle HTTP request/response.
+Define the logout endpoint.
 
 **Target File:** `src/routes/users-router.ts`
 
 **Steps:**
-1.  Add a new POST route `/profile`:
-    - **Path:** `/profile` (resulting in `POST /api/users/profile`)
+1.  Add a new POST route `/logout`:
+    - **Path:** `/logout` (resulting in `POST /api/users/logout`)
     - **Logic:**
-        - Extract the `Authorization` header.
-        - Parse the Bearer token: `const token = headers.authorization?.split(' ')[1]`.
+        - Extract the Bearer token from the `Authorization` header.
         - If no token is provided, return `{ "message": "unauthorized" }` with a 401 status.
-        - Call `usersService.getUserProfile(token, body)`.
+        - Call `usersService.logoutUser(token, body)`.
         - If it returns `null`, return `{ "message": "unauthorized" }` with a 401 status.
         - If successful, return the JSON response:
           ```json
@@ -47,19 +45,18 @@ Define the endpoint and handle HTTP request/response.
               }
           }
           ```
-          *(Note: Per requirements, use the message "User created successfully" even for profile retrieval).*
+          *(Note: Per requirements, use the message "User created successfully" even for logout).*
 
 2.  **Schema Validation:**
     - Use `t.Object` for the body validation (`email` and `password`).
 
 ## 3. Verification
 1.  Ensure the server is running: `bun run dev`.
-2.  Login first to obtain a session token.
-3.  Test the profile endpoint using `curl`:
+2.  Login to obtain a session token.
+3.  Test the logout endpoint using `curl`:
     ```bash
-    curl -X POST http://localhost:3000/api/users/profile \
+    curl -X POST http://localhost:3000/api/users/logout \
     -H "Authorization: Bearer <YOUR_TOKEN>" \
-    -H "Content-Type: application/json" \
-    -d '{"email": "fi@mail.com", "password": "password123"}'
+    -H "Content-Type: application/json" 
     ```
-4.  Verify that it returns the user profile on success or "unauthorized" on incorrect token/credentials.
+4.  Verify that it returns the user details and the session is removed from the database (subsequent requests using the same token should fail).

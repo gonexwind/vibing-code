@@ -65,44 +65,38 @@ export const usersService = {
 		return token;
 	},
 
-	async getUserProfile(token: string, credentials: any) {
-		const { email, password } = credentials;
+	async getUserProfile(token: string) {
+		return await this.findUserByToken(token);
+	},
 
-		// 1. Verify session token
-		const [session] = await db
+	async logoutUser(token: string) {
+		const userProfile = await this.findUserByToken(token);
+
+		if (!userProfile) {
+			return null;
+		}
+
+		// Delete the session
+		await db.delete(sessions).where(eq(sessions.token, token));
+
+		return userProfile;
+	},
+
+	async findUserByToken(token: string) {
+		// Use innerJoin to fetch session and user in one query
+		const [result] = await db
 			.select()
 			.from(sessions)
+			.innerJoin(users, eq(sessions.userId, users.id))
 			.where(eq(sessions.token, token))
 			.limit(1);
 
-		if (!session) {
+		if (!result) {
 			return null;
 		}
 
-		// 2. Fetch associated user
-		const [user] = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, session.userId))
-			.limit(1);
-
-		if (!user) {
-			return null;
-		}
-
-		// 3. Verify credentials (email & password)
-		if (user.email !== email) {
-			return null;
-		}
-
-		const isPasswordValid = await bcrypt.compare(password, user.password);
-
-		if (!isPasswordValid) {
-			return null;
-		}
-
-		// 4. Return user profile (exclude password)
-		const { password: _, ...userProfile } = user;
-		return userProfile;
+		// Exclude password from the returned user object
+		const { password: _, ...userWithoutPassword } = result.users;
+		return userWithoutPassword;
 	},
 };
