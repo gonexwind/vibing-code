@@ -110,6 +110,18 @@ All APIs fall under the `/api/users` prefix.
 
 ---
 
+## API Documentation (Swagger)
+
+The project includes built-in interactive API documentation powered by Swagger. This allows you to explore the available endpoints, view request/response schemas, and test the APIs directly from your browser.
+
+- **Swagger UI URL:** `http://localhost:3000/swagger`
+
+### Interactive Testing
+1.  **Public Routes**: You can test Registration and Login directly by providing the required payload.
+2.  **Protected Routes**: After logging in, copy your session token. Click the **"Authorize"** button at the top of the Swagger page and paste your token under the `bearerAuth` definition. You can then test `/profile` and `/logout` with a valid session header automatically attached.
+
+---
+
 ## Development Setup
 
 Follow these steps to run the application locally.

@@ -1,49 +1,88 @@
-# Feature Implementation Plan: API Unit Testing
+# Feature Implementation Plan: Comprehensive API Documentation (Swagger)
 
 ## Overview
-Implement comprehensive unit tests for all available user authentication and management APIs using `bun test`.
+The goal of this task is to fully configure and populate the Swagger UI for this project so that other developers or client applications can easily understand and use the available APIs. While the basic `@elysiajs/swagger` plugin is installed, our routes currently lack the necessary descriptive metadata to generate a useful API documentation page.
 
-## Technical Requirements
-- **Framework:** `bun test`
-- **Location:** All test files must be saved in the `tests` directory at the root of the project.
-- **Data Consistency Requirement:** The database state MUST be cleared before every single test scenario executes to ensure tests are isolated and consistent. (e.g., Use `beforeEach` hooks to clear the `users` and `sessions` tables).
+## Technical Setup Verification
+1.  **Check Plugin Registration**: Verify in `src/index.ts` that `@elysiajs/swagger` is imported and registered with the application.
+    ```typescript
+    import { swagger } from "@elysiajs/swagger";
+    // Ensure app.use(swagger()) is present
+    export const app = new Elysia()
+        .use(swagger({
+            documentation: {
+                info: {
+                    title: 'Vibing Code User Authentication API',
+                    version: '1.0.0'
+                }
+            }
+        }))
+    // ...
+    ```
 
----
+## Implementation Steps
 
-## Test Scenarios to Implement
+Your task is to update `src/routes/users-router.ts` to add detailed OpenAPI metadata to every existing route.
 
-Do not worry about the low-level implementation details in this document; simply follow this list of scenarios and write the corresponding test blocks. Ensure you cover as many edge cases as possible based on these scenarios.
+### Step 1: Add Swagger Metadata to Public Routes
 
-### 1. User Registration (`POST /api/users`)
-*   **Success Scenario:**
-    *   Register a new user with valid `name`, `email`, and `password`. Verify the user is created and returned correctly (status 200).
-*   **Failure Scenarios (Validation & Constraints):**
-    *   Attempt to register with an email that is already in use (Conflict/Error handling).
-    *   Attempt to register with a `name` exceeding 255 characters.
-    *   Attempt to register with an invalid `email` format.
-    *   Attempt to register with a `password` shorter than 8 characters.
-    *   Attempt to register with missing required fields in the request body.
+For both the **Registration (`POST /`)** and **Login (`POST /login`)** routes, update the route options object (the 3rd parameter of the `.post` method).
 
-### 2. User Login (`POST /api/users/login`)
-*   **Success Scenario:**
-    *   Login with valid credentials. Verify a valid session token is returned (status 200) and a session record is created in the database.
-*   **Failure Scenarios:**
-    *   Attempt to login with an unregistered email. (Expect 401 Unauthorized)
-    *   Attempt to login with a correct email but an incorrect password. (Expect 401 Unauthorized)
-    *   Attempt to login with an invalid email format in the request body. (Validation Error)
-    *   Attempt to login with missing fields. (Validation Error)
+Add a `detail` object and a `response` object to describe the endpoint:
 
-### 3. Get User Profile (`POST /api/users/profile`)
-*   **Success Scenario:**
-    *   Request profile with a valid `Bearer token` in the `Authorization` header. Verify the user profile data is returned correctly and that the **password is not exposed**.
-*   **Failure Scenarios (Authentication):**
-    *   Attempt to request profile without an `Authorization` header. (Expect 401 Unauthorized)
-    *   Attempt to request profile with an invalid, malformed, or fake Bearer token. (Expect 401 Unauthorized)
+**Example Implementation (Registration):**
+```typescript
+{
+    body: t.Object({ /* existing validation */ }),
+    response: {
+        200: t.Object({
+            message: t.String(),
+            data: t.Object({
+                id: t.Number(),
+                name: t.String(),
+                email: t.String(),
+                createdAt: t.Any()
+            })
+        }),
+        400: t.Object({ message: t.String() })
+    },
+    detail: {
+        summary: "Register a new user",
+        description: "Creates a new user record in the database with hashed passwords.",
+        tags: ["Authentication"]
+    }
+}
+```
 
-### 4. User Logout (`POST /api/users/logout`)
-*   **Success Scenario:**
-    *   Request logout with a valid `Bearer token`. Verify the return value (status 200) and **crucially**, verify that the session record has been successfully deleted from the database.
-*   **Failure Scenarios:**
-    *   Attempt to logout without an `Authorization` header. (Expect 401 Unauthorized)
-    *   Attempt to logout with an invalid or previously deleted token. (Expect 401 Unauthorized) 
-    *   Attempt to request the profile endpoint using the same token *after* a successful logout to ensure it fails.
+Repeat a similar process for **Login** (updating the `summary`, `description`, and `response` schema to match whatlogin returns).
+
+### Step 2: Add Swagger Metadata to Protected Routes
+
+Protected routes currently lack the 3rd parameter entirely. You will need to add it to both **Get Profile (`POST /profile`)** and **Logout (`POST /logout`)**.
+
+Since these require a Bearer token, you must also specify security requirements in the `detail` object so the Swagger UI displays a lock icon indicating authentication is needed.
+
+**Example Implementation (Profile):**
+```typescript
+.post("/profile", async ({ user, authError }) => {
+    // existing logic
+}, {
+    response: {
+        200: t.Object({ /* profile schema */ }),
+        401: t.Object({ message: t.String() })
+    },
+    detail: {
+        summary: "Get current user profile",
+        description: "Returns the profile of the currently authenticated user based on the Bearer token.",
+        tags: ["User Action"],
+        security: [{ bearerAuth: [] }]
+    }
+})
+```
+
+### Step 3: Run and Verify
+
+1.  Start the application in development mode: `bun run dev`
+2.  Open your browser and navigate to `http://localhost:3000/swagger`.
+3.  Verify that all 4 endpoints are visible, categorised under "Authentication" and "User Action".
+4.  Verify that you can see the expected Request Body and Response Models for each endpoint.

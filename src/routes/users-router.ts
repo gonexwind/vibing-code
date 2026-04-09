@@ -24,6 +24,27 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				email: t.String({ format: "email", maxLength: 255 }),
 				password: t.String({ minLength: 8, maxLength: 255 }),
 			}),
+			response: {
+				200: t.Object({
+					message: t.String(),
+					data: t.Object({
+						id: t.Number(),
+						name: t.String(),
+						email: t.String(),
+						createdAt: t.Any(),
+					}),
+				}),
+				400: t.Object({
+					message: t.String(),
+				}),
+				422: t.Any(),
+			},
+			detail: {
+				summary: "Register a new user",
+				description:
+					"Creates a new user account with hashed password storage and unique email validation.",
+				tags: ["Authentication"],
+			},
 		}
 	)
 	.post(
@@ -46,6 +67,22 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				email: t.String({ format: "email" }),
 				password: t.String(),
 			}),
+			response: {
+				200: t.Object({
+					message: t.String(),
+					data: t.String({ description: "UUID session token" }),
+				}),
+				401: t.Object({
+					message: t.String(),
+				}),
+				422: t.Any(),
+			},
+			detail: {
+				summary: "User login",
+				description:
+					"Authenticates a user and returns a session token for subsequent protected requests.",
+				tags: ["Authentication"],
+			},
 		}
 	)
 
@@ -67,21 +104,69 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 
 		return { user, token };
 	})
-	.post("/profile", async ({ user, authError }) => {
-		if (authError) return { message: authError };
+	.post(
+		"/profile",
+		async ({ user, authError }) => {
+			if (authError) return { message: authError };
 
-		return {
-			message: "Get User successfully",
-			data: user,
-		};
-	})
-	.post("/logout", async ({ token, authError }) => {
-		if (authError) return { message: authError };
+			return {
+				message: "Get User successfully",
+				data: user,
+			};
+		},
+		{
+			response: {
+				200: t.Object({
+					message: t.String(),
+					data: t.Object({
+						id: t.Number(),
+						name: t.String(),
+						email: t.String(),
+						createdAt: t.Any(),
+					}),
+				}),
+				401: t.Object({ message: t.String() }),
+			},
+			detail: {
+				summary: "Get user profile",
+				description:
+					"Returns the profile of the currently authenticated user. Requires Bearer token.",
+				tags: ["User Action"],
+				security: [{ bearerAuth: [] }],
+			},
+		}
+	)
+	.post(
+		"/logout",
+		async ({ token, authError }) => {
+			if (authError) return { message: authError };
 
-		const userProfile = await usersService.logoutUser(token);
+			const userProfile = await usersService.logoutUser(token);
 
-		return {
-			message: "",
-			data: userProfile,
-		};
-	});
+			return {
+				message: "",
+				data: userProfile,
+			};
+		},
+		{
+			response: {
+				200: t.Object({
+					message: t.String(),
+					data: t.Object({
+						id: t.Number(),
+						name: t.String(),
+						email: t.String(),
+						createdAt: t.Any(),
+					}),
+				}),
+				401: t.Object({ message: t.String() }),
+			},
+			detail: {
+				summary: "User logout",
+				description:
+					"Invalidates the current session token to protect against unauthorized future use.",
+				tags: ["User Action"],
+				security: [{ bearerAuth: [] }],
+			},
+		}
+	);

@@ -3,7 +3,25 @@ import { swagger } from "@elysiajs/swagger";
 import { usersRouter } from "./routes/users-router";
 
 export const app = new Elysia()
-	.use(swagger())
+	.use(
+		swagger({
+			documentation: {
+				info: {
+					title: "Vibing Code User Authentication API",
+					version: "1.0.0",
+				},
+				components: {
+					securitySchemes: {
+						bearerAuth: {
+							type: "http",
+							scheme: "bearer",
+							bearerFormat: "JWT",
+						},
+					},
+				},
+			},
+		})
+	)
 	.use(usersRouter)
 	.get("/", () => "Hello Elysia");
 
