@@ -49,7 +49,7 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 	)
 	.post(
 		"/profile",
-		async ({ body, headers, set }) => {
+		async ({ headers, set }) => {
 			const token = headers.authorization?.split(" ")[1];
 
 			if (!token) {
@@ -57,7 +57,7 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				return { message: "unauthorized" };
 			}
 
-			const user = await usersService.getUserProfile(token, body);
+			const user = await usersService.getUserProfile(token);
 
 			if (!user) {
 				set.status = 401;
@@ -68,11 +68,28 @@ export const usersRouter = new Elysia({ prefix: "/api/users" })
 				message: "Get User successfully",
 				data: user,
 			};
-		},
-		{
-			body: t.Object({
-				email: t.String(),
-				password: t.String(),
-			}),
+		}
+	)
+	.post(
+		"/logout",
+		async ({ headers, set }) => {
+			const token = headers.authorization?.split(" ")[1];
+
+			if (!token) {
+				set.status = 401;
+				return { message: "unauthorized" };
+			}
+
+			const user = await usersService.logoutUser(token);
+
+			if (!user) {
+				set.status = 401;
+				return { message: "unauthorized" };
+			}
+
+			return {
+				message: "",
+				data: user,
+			};
 		}
 	);

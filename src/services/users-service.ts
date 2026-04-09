@@ -65,9 +65,7 @@ export const usersService = {
 		return token;
 	},
 
-	async getUserProfile(token: string, credentials: any) {
-		const { email, password } = credentials;
-
+	async getUserProfile(token: string) {
 		// 1. Verify session token
 		const [session] = await db
 			.select()
@@ -90,16 +88,36 @@ export const usersService = {
 			return null;
 		}
 
-		// 3. Verify credentials (email & password)
-		if (user.email !== email) {
+		// 4. Return user profile (exclude password)
+		const { password: _, ...userProfile } = user;
+		return userProfile;
+	},
+
+	async logoutUser(token: string) {
+		// 1. Verify session token
+		const [session] = await db
+			.select()
+			.from(sessions)
+			.where(eq(sessions.token, token))
+			.limit(1);
+
+		if (!session) {
 			return null;
 		}
 
-		const isPasswordValid = await bcrypt.compare(password, user.password);
+		// 2. Fetch associated user
+		const [user] = await db
+			.select()
+			.from(users)
+			.where(eq(users.id, session.userId))
+			.limit(1);
 
-		if (!isPasswordValid) {
+		if (!user) {
 			return null;
 		}
+
+		// 3. Delete the session
+		await db.delete(sessions).where(eq(sessions.token, token));
 
 		// 4. Return user profile (exclude password)
 		const { password: _, ...userProfile } = user;
